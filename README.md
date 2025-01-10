@@ -1,1 +1,1 @@
-# n-body_simulation_python
+# N-Body Simulation
