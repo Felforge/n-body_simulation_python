@@ -2,8 +2,6 @@ import sys
 import os
 sys.path.append(os.path.abspath('./'))
 import numpy as np
-parent_dir = os.path.abspath(os.path.join(os.getcwd(), "."))
-print(parent_dir)
 from simulation import create_body
 from physics_engine import PhysicsEngine
 
