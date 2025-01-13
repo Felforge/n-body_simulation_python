@@ -29,11 +29,11 @@ class PhysicsEngine:
         self.bodies = bodies
         self.mode = mode
         self.config = self.load_config()
-        self.prev_time = min(self.bodies.keys)
-        self.start_time = max(self.bodies.keys)
+        self.prev_time = min(list(self.bodies.keys()))
+        self.start_time = max(list(self.bodies.keys()))
         self.current_state = bodies[self.start_time]
         self.current_bodies = bodies[self.start_time]["body_list"]
-        self.loaded = self.current_state["s_xcm"] is not None
+        self.loaded = "s_xcm" in list(self.current_bodies[0].keys())
 
     def load_config(self):
         """
@@ -141,8 +141,8 @@ class PhysicsEngine:
                         current_sum += 3 * body[dim1] * body[f"a_{dim1}"]
                         current_sum += 3 * (body[f"v_{dim1}"]**2)
                         for dim in ["x", "y", "z"]:
-                            current_sum -= (body[f"v_{dim}"] - body[f"v_{dim}cm"])**2
-                            current_sum -= (body[dim] - body[f"{dim}_cm"]) * (body[f"a_{dim}"] - body[f"a_{dim}cm"])
+                            current_sum -= (body[f"v_{dim}"] - self.current_state[f"v_{dim}cm"])**2
+                            current_sum -= (body[dim] - self.current_state[f"{dim}_cm"]) * (body[f"a_{dim}"] - self.current_state[f"a_{dim}cm"])
                         current_sum *= 2
                     else:
                         current_sum += 3 * body[f"a_{dim1}"] * body[dim2]
@@ -170,8 +170,8 @@ class PhysicsEngine:
                         current_sum += 9 * body[f"v_{dim1}"] * body[f"a_{dim1}"]
                         current_sum += 3 * body[dim1] * body[f"j_{dim1}"]
                         for dim in ["x", "y", "z"]:
-                            current_sum -= 3 * (body[f"v_{dim}"] - body[f"v_{dim}cm"]) * (body[f"a_{dim}"] - body[f"a_{dim}cm"])
-                            current_sum -= (body[dim] - body[f"{dim}_cm"]) * (body[f"j_{dim}"] - body[f"j_{dim}cm"])
+                            current_sum -= 3 * (body[f"v_{dim}"] - self.current_state[f"v_{dim}cm"]) * (body[f"a_{dim}"] - self.current_state[f"a_{dim}cm"])
+                            current_sum -= (body[dim] - self.current_state[f"{dim}_cm"]) * (body[f"j_{dim}"] - self.current_state[f"j_{dim}cm"])
                         current_sum *= 2
                     else:
                         current_sum += 3 * body[f"j_{dim1}"] * body[dim2]
@@ -200,9 +200,9 @@ class PhysicsEngine:
                         current_sum += 15 * body[f"v_{dim1}"] * body[f"s_{dim1}"]
                         current_sum += 3 * body[dim1] * body[f"c_{dim1}"]
                         for dim in ["x", "y", "z"]:
-                            current_sum -= 10 * (body[f"a_{dim}"] - body[f"a_{dim}cm"]) * (body[f"j_{dim}"] - body[f"j_{dim}cm"])
-                            current_sum -= 5 * (body[f"v_{dim}"] - body[f"v_{dim}cm"]) * (body[f"s_{dim}"] - body[f"s_{dim}cm"])
-                            current_sum -= (body[dim] - body[f"{dim}_cm"]) * (body[f"c_{dim}"] - body[f"c_{dim}cm"])
+                            current_sum -= 10 * (body[f"a_{dim}"] - self.current_state[f"a_{dim}cm"]) * (body[f"j_{dim}"] - self.current_state[f"j_{dim}cm"])
+                            current_sum -= 5 * (body[f"v_{dim}"] - self.current_state[f"v_{dim}cm"]) * (body[f"s_{dim}"] - self.current_state[f"s_{dim}cm"])
+                            current_sum -= (body[dim] - self.current_state[f"{dim}_cm"]) * (body[f"c_{dim}"] - self.current_state[f"c_{dim}cm"])
                         current_sum *= 2
                     else:
                         current_sum += 30 * body[f"a_{dim1}"] * body[f"j_{dim2}"]
