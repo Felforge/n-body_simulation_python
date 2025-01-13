@@ -77,11 +77,11 @@ class PhysicsEngine:
 
     def get_acceleration(self, target_body) -> float | float | float | float:
         """
-        Approximate acceleration using just Newtonian Force
-        This is needed to start the simulation up
+        On galactic mode before all derivatives are calculated
+        Just newtonian force is used as their is a circular dependency
         Asumed to be isolated X, Y or Z, not vector
         """
-        if not self.loaded:
+        if not self.loaded and self.mode == "galactic":
             return [num / target_body[0] for num in self.get_newtonian_force(target_body)]
         return [num / target_body[0] for num in self.get_total_force(target_body)]
 
