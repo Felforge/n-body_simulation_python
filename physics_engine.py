@@ -21,11 +21,13 @@ s_x, s_y, s_z
 class PhysicsEngine:
     """
     Physice engine for N-body simulation
+    Modes are "galactic" and "cosmic"
     """
-    def __init__(self, bodies):
+    def __init__(self, bodies, mode="galactic"):
         self.G = 6.6743e-11
         self.c = 3e8
         self.bodies = bodies
+        self.mode = mode
         self.config = self.load_config()
         self.prev_time = min(self.bodies.keys)
         self.start_time = max(self.bodies.keys)
@@ -63,12 +65,15 @@ class PhysicsEngine:
         Get valid time step in seconds
         """
         t_1 = accuracy * np.sqrt(softening / self.get_max_acceleration_magnitude())
-        if not self.loaded:
+        if self.mode == "galactic":
+            if not self.loaded:
+                return t_1
+            C = abs(self.divide_matrix(self.get_Q_ddot, self.get_Q_3dot))
+            t_2 = accuracy_rad * C
+            t_3 = abs(s) / abs(s_dot)
+            return min(t_1, t_2, t_3)
+        elif self.mode == "cosmic":
             return t_1
-        C = abs(self.divide_matrix(self.get_Q_ddot, self.get_Q_3dot))
-        t_2 = accuracy_rad * C
-        t_3 = abs(s) / abs(s_dot)
-        return min(t_1, t_2, t_3)
 
     def get_acceleration(self, target_body) -> float | float | float | float:
         """
@@ -251,20 +256,21 @@ class PhysicsEngine:
             self.current_bodies[i]["a_y"] = y
             self.current_bodies[i]["a_z"] = z
 
-            prev_state = self.bodies[self.prev_time]["body_list"][i]
-            derivatives = ["a", "j", "s", "c"]
-            for j, der in enumerate(derivatives[1:]):
-                prev_der = derivatives[j]
-                if prev_state[f"{prev_der}_x"] is not None:
-                    xi = prev_state[f"{prev_der}_x"]
-                    yi = prev_state[f"{prev_der}_y"]
-                    zi = prev_state[f"{prev_der}_z"]
-                    x, y, z = self.approximate_next(xi, yi, zi, x, y, z)
-                    self.current_bodies[i][f"{der}_x"] = x
-                    self.current_bodies[i][f"{der}_y"] = y
-                    self.current_bodies[i][f"{der}_z"] = z
-                else:
-                    break
+            if self.mode == "galactic":
+                prev_state = self.bodies[self.prev_time]["body_list"][i]
+                derivatives = ["a", "j", "s", "c"]
+                for j, der in enumerate(derivatives[1:]):
+                    prev_der = derivatives[j]
+                    if prev_state[f"{prev_der}_x"] is not None:
+                        xi = prev_state[f"{prev_der}_x"]
+                        yi = prev_state[f"{prev_der}_y"]
+                        zi = prev_state[f"{prev_der}_z"]
+                        x, y, z = self.approximate_next(xi, yi, zi, x, y, z)
+                        self.current_bodies[i][f"{der}_x"] = x
+                        self.current_bodies[i][f"{der}_y"] = y
+                        self.current_bodies[i][f"{der}_z"] = z
+                    else:
+                        break
 
         self.current_state["body_list"] = self.current_bodies
 
@@ -282,20 +288,21 @@ class PhysicsEngine:
         self.current_state["a_ycm"] = y_cm
         self.current_state["a_zcm"] = z_cm
 
-        prev_state = self.bodies[self.prev_time]
-        derivatives = ["a", "j", "s", "c"]
-        for i, der in enumerate(derivatives[1:]):
-            prev_der = derivatives[i]
-            if prev_state[f"{prev_der}_xcm"] is not None:
-                x_icm = prev_state[f"{prev_der}_xcm"]
-                y_icm = prev_state[f"{prev_der}_ycm"]
-                z_icm = prev_state[f"{prev_der}_zcm"]
-                x_cm, y_cm, z_cm = self.approximate_next(x_icm, y_icm, z_icm, x_cm, y_cm, z_cm)
-                self.current_state[f"{der}_xcm"] = x_cm
-                self.current_state[f"{der}_ycm"] = y_cm
-                self.current_state[f"{der}_zcm"] = z_cm
-            else:
-                break
+        if self.mode == "galactic":
+            prev_state = self.bodies[self.prev_time]
+            derivatives = ["a", "j", "s", "c"]
+            for i, der in enumerate(derivatives[1:]):
+                prev_der = derivatives[i]
+                if prev_state[f"{prev_der}_xcm"] is not None:
+                    x_icm = prev_state[f"{prev_der}_xcm"]
+                    y_icm = prev_state[f"{prev_der}_ycm"]
+                    z_icm = prev_state[f"{prev_der}_zcm"]
+                    x_cm, y_cm, z_cm = self.approximate_next(x_icm, y_icm, z_icm, x_cm, y_cm, z_cm)
+                    self.current_state[f"{der}_xcm"] = x_cm
+                    self.current_state[f"{der}_ycm"] = y_cm
+                    self.current_state[f"{der}_zcm"] = z_cm
+                else:
+                    break
 
         if self.prev_time != self.start_time:
             del self.bodies[self.prev_time]
