@@ -50,7 +50,8 @@ class PhysicsEngine:
 
     def get_total_force(self, target_body) -> float | float | float | float:
         """
-        Add up Newtonian, Radiation, Post-Newtonian, Tidal, and Spin forces
+        Add up Newtonian, Radiation, Post-Newtonian, Tidal, and Spin forces for galactic
+        Add up Newtonian, Dark Matter, and Dark Enegery forces for cosmic
         Return, X, Y, Z and total
         """
 
