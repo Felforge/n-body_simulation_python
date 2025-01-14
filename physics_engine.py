@@ -60,6 +60,9 @@ class PhysicsEngine:
         Use Barnes-Hut Traversal to calculate Newtonian force
         Return, X, Y, Z and total
         """
+        
+    def build_octree(self, bodies_subset, x_min, x_max, y_min, y_max, z_min, z_max):
+        
 
     def get_time_step(self, accuracy, accuracy_rad, softening, s, s_dot) -> float:
         """
