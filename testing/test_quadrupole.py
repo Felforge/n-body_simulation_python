@@ -1,9 +1,9 @@
 import sys
 import os
-sys.path.append(os.path.abspath('./'))
 import numpy as np
+sys.path.append(os.path.abspath('./'))
 from simulation import create_body
-from physics_engine import PhysicsEngine
+from quadrupole import get_Q_ddot, get_Q_3dot, get_Q_5dot
 
 G = 6.6743e-11
 
@@ -43,8 +43,8 @@ def test_Q_ddot():
     """
     Test symmetry of Q_ddot function
     """
-    bodies = generate_bodies()
-    matrix = PhysicsEngine(bodies).get_Q_ddot()
+    current_state = generate_bodies()[0]
+    matrix = get_Q_ddot(current_state)
     assert matrix[0][1] == matrix[1][0]
     assert matrix[0][2] == matrix[2][0]
     assert matrix[1][2] == matrix[2][1]

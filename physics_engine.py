@@ -63,7 +63,7 @@ class PhysicsEngine:
         if self.mode == "galactic":
             if not self.loaded:
                 return t_1
-            C = abs(divide_matrix(get_Q_ddot(self.current_bodies, self.current_state), get_Q_3dot(self.current_bodies, self.current_state)))
+            C = abs(divide_matrix(get_Q_ddot(self.current_state), get_Q_3dot(self.current_state)))
             t_2 = accuracy_rad * C
             t_3 = abs(s) / abs(s_dot)
             return min(t_1, t_2, t_3)
@@ -95,7 +95,7 @@ class PhysicsEngine:
         Get radiation reaction force components on target_body
         """
         multiple = -1 * 2 * self.G * target_body["m"] / (5 * (self.c**5))
-        Q_5dot = get_Q_5dot(self.current_bodies, self.current_state)
+        Q_5dot = get_Q_5dot(self.current_state)
         forces = {}
         dimensions = ["x", "y", "z"]
         for i, row in enumerate(Q_5dot):

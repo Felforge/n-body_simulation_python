@@ -1,8 +1,9 @@
-def get_Q_ddot(bodies, current_state):
+def get_Q_ddot(current_state):
     """
     Get second derivative of Quadrupole moment with respect to time
     Returns 3x3 matrix
     """
+    bodies = current_state["body_list"]
     matrix = []
     for dim1 in ["x", "y", "z"]:
         row = []
@@ -26,11 +27,12 @@ def get_Q_ddot(bodies, current_state):
         matrix.append(row)
     return matrix
 
-def get_Q_3dot(bodies, current_state):
+def get_Q_3dot(current_state):
     """
     Get third derivative of Quadrupole moment with respect to time
     Returns 3x3 matrix
     """
+    bodies = current_state["body_list"]
     matrix = []
     for dim1 in ["x", "y", "z"]:
         row = []
@@ -55,11 +57,12 @@ def get_Q_3dot(bodies, current_state):
         matrix.append(row)
     return matrix
 
-def get_Q_5dot(bodies, current_state):
+def get_Q_5dot(current_state):
     """
     Get fifth derivative of Quadrupole moment with respect to time
     Returns 3x3 matrix
     """
+    bodies = current_state["body_list"]
     matrix = []
     for dim1 in ["x", "y", "z"]:
         row = []
