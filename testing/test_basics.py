@@ -44,7 +44,7 @@ def test_distance(xi, yi, zi, xf, yf, zf, r):
                                  {"m" : 100, "a_x" : -1, "a_y" : -1, "a_z" : -1}],
                              "a",
                              [0, 0, 0])
-                             # Add two more test cases
+                             # Add two more test cases, both with different masses
                          ])
 def test_center_of_mass(bodies, mode, proven):
     """
