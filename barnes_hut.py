@@ -56,8 +56,15 @@ class Octree:
         tree = []
         for mode in ["ppp", "ppm", "pmp", "mpp", "mmp", "mpm", "pmm", "mmm"]:
             x_bound, y_bound, z_bound = self.get_subidivision_bounds(mode)
-            tree.append(Octree(self.subdivide_bodies(self.bodies, x_bound, y_bound, z_bound),
-                                x_bound, y_bound, z_bound))
+            child = Octree(self.subdivide_bodies(self.bodies, x_bound, y_bound, z_bound),
+                                x_bound, y_bound, z_bound)
+            self.mass += child.mass
+            for i in range(3):
+                self.cm[i] += child.mass * child.cm[i]
+            tree.append(child)
+        if self.mass > 0:
+            for i in range(3):
+                self.cm[i] /= self.mass
         return tree
 
     def get_bodies(self):
@@ -65,65 +72,42 @@ class Octree:
         Return bodies list
         """
         return self.bodies
-    
+
     def get_force_components(self):
         """
         Return components needed for force
         """
         return self.mass, self.cm[0], self.cm[1], self.cm[2]
 
-    def get_force(self, body):
+    def get_force(self, body, theta=0.5):
         """
         Get force on given body
         """
+        if self.mass == 0 or len(self.bodies) == 1 and self.bodies[0] == body:
+            return 0, 0, 0
+
         if body not in self.bodies:
             x, y, z = self.cm
-            r = get_distance(body["x"], body["y"], body["z"], x, y, z)
-            f = (G * body["m"] * self.mass) / (r**2)
-            f_x = f * (x - body["x"]) / r
-            f_y = f * (y - body["y"]) / r
-            f_z = f * (z - body["z"]) / r
-            return f_x, f_y, f_z
-        else:
-            if len(self.bodies) <= 1:
+            d = get_distance(body["x"], body["y"], body["z"], x, y, z)
+            if d == 0:
                 return 0, 0, 0
-            for child in self.tree:
-                f_x = 0
-                f_y = 0
-                f_z = 0
-                # Add forces from recursion and return
 
-    # def add_body(self, body):
-    #     """
-    #     Add body to node
-    #     """
-    #     self.mass = body["m"]
-    #     self.x_cm = body["x"]
-    #     self.y_cm = body["y"]
-    #     self.z_cm = body["z"]
-    # def add_bodies(self, bodies):
-    #     """
-    #     Handle multiple bodies
-    #     """
-        
-    # def get_bound(self):
-    #     """
-    #     Get bounds for subdivision
-    #     """
-    #     coord_bounds = []
-    #     mid_x = (self.x_bound[0] + self.x_bound[1]) // 2
-    #     mid_y = (self.y_bound[0] + self.y_bound[1]) // 2
-    #     mid_z = (self.z_bound[0] + self.z_bound[1]) // 2
-    #     x_1 = [self.z_bound[0], mid_x]
-    #     x_2 = [mid_x, self.z_bound[1]]
-    #     y_1 = [self.z_bound[0], mid_x]
-    #     y_2 = [mid_x, self.z_bound[1]]
-    #     y_1 = [self.z_bound[0], mid_x]
-    #     y_2 = [mid_x, self.z_bound[1]]
-    #     for x in self.x_bound:
-    #         for y in self.y_bound:
-    #             for z in self.z_bound:
-    #                 if x < mid_x:
+            s = self.x_bound[1] - self.x_bound[0]
+            if (s/d < theta) or len(self.bodies) == 1:
+                f = (G * body["m"] * self.mass) / (d**2)
+                f_x = f * (x - body["x"]) / d
+                f_y = f * (y - body["y"]) / d
+                f_z = f * (z - body["z"]) / d
+                return f_x, f_y, f_z
+
+        f_x = f_y = f_z = 0
+        for child in self.tree:
+            if child.mass > 0:
+                cf_x, cf_y, cf_z = child.get_force(body, theta)
+                f_x += cf_x
+                f_y += cf_y
+                f_z += cf_z
+        return f_x, f_y, f_z
 
 class BarnesHutError(Exception):
     """

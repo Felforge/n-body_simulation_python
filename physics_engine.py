@@ -1,5 +1,9 @@
-import json
 import numpy as np
+from barnes_hut import Octree
+from load_condig import load_config
+from basic_physics import get_cm, approximate_next, divide_matrix
+from quadrupole import get_Q_ddot, get_Q_3dot, get_Q_5dot
+from yoshida import *
 
 """
 Bodies Contains:
@@ -28,25 +32,12 @@ class PhysicsEngine:
         self.c = 3e8
         self.bodies = bodies
         self.mode = mode
-        self.config = self.load_config()
+        self.config = load_config()
         self.prev_time = min(list(self.bodies.keys()))
         self.start_time = max(list(self.bodies.keys()))
         self.current_state = bodies[self.start_time]
         self.current_bodies = bodies[self.start_time]["body_list"]
         self.loaded = "s_xcm" in list(self.current_bodies[0].keys())
-
-    def load_config(self):
-        """
-        Load config file
-        """
-        f = open("config.json", encoding="utf-8")
-        return json.load(f)
-
-    def get_bodies(self):
-        """
-        Return bodies
-        """
-        return self.bodies
 
     def get_total_force(self, target_body) -> float | float | float | float:
         """
@@ -60,9 +51,9 @@ class PhysicsEngine:
         Use Barnes-Hut Traversal to calculate Newtonian force
         Return, X, Y, Z and total
         """
-        
-    def build_octree(self, bodies_subset, x_min, x_max, y_min, y_max, z_min, z_max):
-        
+        bound = self.config["simulation_distance"]
+        octree = Octree(self.current_bodies, [-bound, bound], [-bound, bound], [-bound, bound])
+        return octree.get_force(target_body)
 
     def get_time_step(self, accuracy, accuracy_rad, softening, s, s_dot) -> float:
         """
@@ -72,7 +63,7 @@ class PhysicsEngine:
         if self.mode == "galactic":
             if not self.loaded:
                 return t_1
-            C = abs(self.divide_matrix(self.get_Q_ddot, self.get_Q_3dot))
+            C = abs(divide_matrix(get_Q_ddot(self.current_bodies, self.current_state), get_Q_3dot(self.current_bodies, self.current_state)))
             t_2 = accuracy_rad * C
             t_3 = abs(s) / abs(s_dot)
             return min(t_1, t_2, t_3)
@@ -99,27 +90,12 @@ class PhysicsEngine:
             max_a = max(max_a, approx_a)
         return max_a
 
-    def divide_matrix(self, matrix_1, matrix_2) -> int:
-        """
-        Divide matrix and return max ratio of corresponding terms
-        Both matricies must be same dimensions
-        Needed for Q_ddot / Q_3dot
-        """
-        max_ratio = None
-        for i, row in enumerate(matrix_1):
-            for j, num in enumerate(row):
-                if max_ratio is None:
-                    max_ratio = num / matrix_2[i][j]
-                else:
-                    max_ratio = max(max_ratio, num / matrix_2[i][j])
-        return max_ratio
-
     def get_radiation_reaction_force(self, target_body) -> float | float | float:
         """
         Get radiation reaction force components on target_body
         """
         multiple = -1 * 2 * self.G * target_body["m"] / (5 * (self.c**5))
-        Q_5dot = self.get_Q_5dot()
+        Q_5dot = get_Q_5dot(self.current_bodies, self.current_state)
         forces = {}
         dimensions = ["x", "y", "z"]
         for i, row in enumerate(Q_5dot):
@@ -128,121 +104,6 @@ class PhysicsEngine:
                 component += num * (target_body[dimensions[i]] - target_body[f"{dimensions[i]}_cm"])
             forces[dimensions[i]] = multiple * component
         return forces["x"], forces["y"], forces["z"]
-
-    def get_Q_ddot(self):
-        """
-        Get second derivative of Quadrupole moment with respect to time
-        Returns 3x3 matrix
-        """
-        matrix = []
-        for dim1 in ["x", "y", "z"]:
-            row = []
-            for dim2 in ["x", "y", "z"]:
-                sum_total = 0
-                for body in self.current_bodies:
-                    current_sum = 0
-                    if dim1 == dim2:
-                        current_sum += 3 * body[dim1] * body[f"a_{dim1}"]
-                        current_sum += 3 * (body[f"v_{dim1}"]**2)
-                        for dim in ["x", "y", "z"]:
-                            current_sum -= (body[f"v_{dim}"] - self.current_state[f"v_{dim}cm"])**2
-                            current_sum -= (body[dim] - self.current_state[f"{dim}_cm"]) * (body[f"a_{dim}"] - self.current_state[f"a_{dim}cm"])
-                        current_sum *= 2
-                    else:
-                        current_sum += 3 * body[f"a_{dim1}"] * body[dim2]
-                        current_sum += 3 * body[f"a_{dim2}"] * body[dim1]
-                        current_sum += 6 * body[f"v_{dim1}"] * body[f"v_{dim2}"]
-                    sum_total += current_sum * body["m"]
-                row.append(sum_total)
-            matrix.append(row)
-        return matrix
-
-
-    def get_Q_3dot(self):
-        """
-        Get third derivative of Quadrupole moment with respect to time
-        Returns 3x3 matrix
-        """
-        matrix = []
-        for dim1 in ["x", "y", "z"]:
-            row = []
-            for dim2 in ["x", "y", "z"]:
-                sum_total = 0
-                for body in self.current_bodies:
-                    current_sum = 0
-                    if dim1 == dim2:
-                        current_sum += 9 * body[f"v_{dim1}"] * body[f"a_{dim1}"]
-                        current_sum += 3 * body[dim1] * body[f"j_{dim1}"]
-                        for dim in ["x", "y", "z"]:
-                            current_sum -= 3 * (body[f"v_{dim}"] - self.current_state[f"v_{dim}cm"]) * (body[f"a_{dim}"] - self.current_state[f"a_{dim}cm"])
-                            current_sum -= (body[dim] - self.current_state[f"{dim}_cm"]) * (body[f"j_{dim}"] - self.current_state[f"j_{dim}cm"])
-                        current_sum *= 2
-                    else:
-                        current_sum += 3 * body[f"j_{dim1}"] * body[dim2]
-                        current_sum += 3 * body[f"j_{dim2}"] * body[dim1]
-                        current_sum += 9 * body[f"a_{dim1}"] * body[f"v_{dim2}"]
-                        current_sum += 9 * body[f"v_{dim1}"] * body[f"a_{dim2}"]
-                    sum_total += current_sum * body["m"]
-                row.append(sum_total)
-            matrix.append(row)
-        return matrix
-
-    def get_Q_5dot(self):
-        """
-        Get fifth derivative of Quadrupole moment with respect to time
-        Returns 3x3 matrix
-        """
-        matrix = []
-        for dim1 in ["x", "y", "z"]:
-            row = []
-            for dim2 in ["x", "y", "z"]:
-                sum_total = 0
-                for body in self.current_bodies:
-                    current_sum = 0
-                    if dim1 == dim2:
-                        current_sum += 30 * body[f"a_{dim1}"] * body[f"j_{dim1}"]
-                        current_sum += 15 * body[f"v_{dim1}"] * body[f"s_{dim1}"]
-                        current_sum += 3 * body[dim1] * body[f"c_{dim1}"]
-                        for dim in ["x", "y", "z"]:
-                            current_sum -= 10 * (body[f"a_{dim}"] - self.current_state[f"a_{dim}cm"]) * (body[f"j_{dim}"] - self.current_state[f"j_{dim}cm"])
-                            current_sum -= 5 * (body[f"v_{dim}"] - self.current_state[f"v_{dim}cm"]) * (body[f"s_{dim}"] - self.current_state[f"s_{dim}cm"])
-                            current_sum -= (body[dim] - self.current_state[f"{dim}_cm"]) * (body[f"c_{dim}"] - self.current_state[f"c_{dim}cm"])
-                        current_sum *= 2
-                    else:
-                        current_sum += 30 * body[f"a_{dim1}"] * body[f"j_{dim2}"]
-                        current_sum += 30 * body[f"a_{dim2}"] * body[f"j_{dim1}"]
-                        current_sum += 15 * body[f"v_{dim1}"] * body[f"s_{dim2}"]
-                        current_sum += 15 * body[f"v_{dim2}"] * body[f"s_{dim1}"]
-                        current_sum += 3 * body[dim1] * body[f"c_{dim2}"]
-                        current_sum += 3 * body[dim2] * body[f"c_{dim1}"]
-                    sum_total += current_sum * body["m"]
-                row.append(sum_total)
-            matrix.append(row)
-        return matrix
-
-    def get_cm(self, mode="pos") -> int | int | int:
-        """
-        Get center of mass components
-        """
-        total_mass = 0
-        result = [0, 0, 0]
-        for body in self.current_bodies:
-            for i, dim in enumerate(["x", "y", "z"]):
-                total_mass += body["m"]
-                if mode == "pos":
-                    result[i] += body["m"] * body[dim]
-                elif mode == "v":
-                    result[i] += body["m"] * body[f"v_{dim}"]
-                elif mode == "a":
-                    result[i] += body["m"] * body[f"a_{dim}"]
-        return [num / total_mass for num in result]
-
-    def approximate_next(self, xi, yi, zi, xf, yf, zf) -> float | float | float:
-        """
-        Approximate next derivative using slope formula
-        """
-        delta_t = self.start_time - self.prev_time
-        return (xf - xi) / delta_t, (yf - yi) / delta_t, (zf - zi) / delta_t
 
     def update_bodies(self, time_step):
         """
@@ -269,7 +130,7 @@ class PhysicsEngine:
                         xi = prev_state[f"{prev_der}_x"]
                         yi = prev_state[f"{prev_der}_y"]
                         zi = prev_state[f"{prev_der}_z"]
-                        x, y, z = self.approximate_next(xi, yi, zi, x, y, z)
+                        x, y, z = approximate_next(self.prev_time, self.start_time, xi, yi, zi, x, y, z)
                         self.current_bodies[i][f"{der}_x"] = x
                         self.current_bodies[i][f"{der}_y"] = y
                         self.current_bodies[i][f"{der}_z"] = z
@@ -278,8 +139,8 @@ class PhysicsEngine:
 
         self.current_state["body_list"] = self.current_bodies
 
-        x_cm, y_cm, z_cm = self.get_cm(mode="a")
-        v_xcm, v_ycm, v_zcm = self.get_cm(mode="v")
+        x_cm, y_cm, z_cm = get_cm(self.current_bodies, mode="a")
+        v_xcm, v_ycm, v_zcm = get_cm(self.current_bodies, mode="v")
         self.current_state["x_cm"] = x_cm
         self.current_state["y_cm"] = y_cm
         self.current_state["z_cm"] = z_cm
@@ -287,7 +148,7 @@ class PhysicsEngine:
         self.current_state["v_ycm"] = v_ycm
         self.current_state["v_zcm"] = v_zcm
 
-        x_cm, y_cm, z_cm = self.get_cm(mode="a")
+        x_cm, y_cm, z_cm = get_cm(self.current_bodies, mode="a")
         self.current_state["a_xcm"] = x_cm
         self.current_state["a_ycm"] = y_cm
         self.current_state["a_zcm"] = z_cm
@@ -301,7 +162,7 @@ class PhysicsEngine:
                     x_icm = prev_state[f"{prev_der}_xcm"]
                     y_icm = prev_state[f"{prev_der}_ycm"]
                     z_icm = prev_state[f"{prev_der}_zcm"]
-                    x_cm, y_cm, z_cm = self.approximate_next(x_icm, y_icm, z_icm, x_cm, y_cm, z_cm)
+                    x_cm, y_cm, z_cm = approximate_next(self.prev_time, self.start_time, x_icm, y_icm, z_icm, x_cm, y_cm, z_cm)
                     self.current_state[f"{der}_xcm"] = x_cm
                     self.current_state[f"{der}_ycm"] = y_cm
                     self.current_state[f"{der}_zcm"] = z_cm
@@ -317,49 +178,15 @@ class PhysicsEngine:
         """
         Use Yoshida integrator to solve for position
         """
-        pos_1 = self.yoshida_pos_step_1_and_4(body[dim], body[f"v_{dim}"], time_step)
+        pos_1 = yoshida_pos_step_1_and_4(body[dim], body[f"v_{dim}"], time_step)
         updated_body = body
         updated_body[dim] = pos_1
-        v_1 = self.yoshida_v_step_1_and_3(body[f"v_{dim}"], self.get_acceleration(updated_body), time_step)
-        pos_2 = self.yoshida_pos_step_2_and_3(pos_1, v_1, time_step)
+        v_1 = yoshida_v_step_1_and_3(body[f"v_{dim}"], self.get_acceleration(updated_body), time_step)
+        pos_2 = yoshida_pos_step_2_and_3(pos_1, v_1, time_step)
         updated_body[dim] = pos_2
-        v_2 = self.yoshida_v_step_2(v_1, self.get_acceleration(updated_body), time_step)
-        pos_3 = self.yoshida_pos_step_2_and_3(pos_2, v_2, time_step)
+        v_2 = yoshida_v_step_2(v_1, self.get_acceleration(updated_body), time_step)
+        pos_3 = yoshida_pos_step_2_and_3(pos_2, v_2, time_step)
         updated_body[dim] = pos_3
-        v_3 = self.yoshida_v_step_1_and_3(v_2, self.get_acceleration(updated_body), time_step)
-        pos_4 = self.yoshida_pos_step_1_and_4(pos_3, v_3, time_step)
+        v_3 = yoshida_v_step_1_and_3(v_2, self.get_acceleration(updated_body), time_step)
+        pos_4 = yoshida_pos_step_1_and_4(pos_3, v_3, time_step)
         return pos_4, v_3
-
-    def yoshida_pos_step_1_and_4(self, pos, v, time_step):
-        """
-        First step of Yoshida integration for position
-        Velocity is assumed to be just X, Y, or Z
-        """
-        c_1 = (-1 / 2) * np.cbrt(2) / (2 - np.cbrt(2))
-        return pos + c_1 * v * time_step
-
-    def yoshida_v_step_1_and_3(self, v, a, time_step):
-        """
-        First step of Yoshida integration for velocity
-        Velocity and Acceleration are assumed to be just X, Y, or Z
-        """
-        d_1 = -1 * np.cbrt(2) / (2 - np.cbrt(2))
-        return v + d_1 * a * time_step
-
-    def yoshida_pos_step_2_and_3(self, pos, v, time_step):
-        """
-        Second step of Yoshida integration for position
-        Velocity is assumed to be just X, Y, or Z
-        """
-        w_0 = -1 * np.cbrt(2) / (2 - np.cbrt(2))
-        w_1 = 1 / (2 - np.cbrt(2))
-        c_2 = (w_0 + w_1) / 2
-        return pos + c_2 * v * time_step
-
-    def yoshida_v_step_2(self, v, a, time_step):
-        """
-        Second step of Yoshida integration for velocity
-        Velocity and Acceleration are assumed to be just X, Y, or Z
-        """
-        d_2 = 1 / (2 - np.cbrt(2))
-        return v + d_2 * a * time_step
