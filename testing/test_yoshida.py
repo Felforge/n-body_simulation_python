@@ -2,10 +2,9 @@ import sys
 import os
 import pytest
 import numpy as np
-from simulation import create_body
-from basic_physics import get_distance, get_cm, approximate_next, divide_matrix
-
 sys.path.append(os.path.abspath('./'))
+from simulation import create_body
+from physics_engine import PhysicsEngine
 
 def calculate_position(xi, v, a, t):
     """

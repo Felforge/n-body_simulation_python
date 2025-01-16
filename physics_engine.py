@@ -1,6 +1,6 @@
 import numpy as np
 from barnes_hut import Octree
-from load_condig import load_config
+from load_config import load_config
 from basic_physics import get_cm, approximate_next, divide_matrix
 from quadrupole import get_Q_ddot, get_Q_3dot, get_Q_5dot
 from yoshida import *

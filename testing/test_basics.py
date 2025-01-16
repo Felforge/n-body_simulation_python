@@ -1,10 +1,9 @@
 import sys
 import os
 import pytest
+sys.path.append(os.path.abspath('./'))
 import numpy as np
 from basic_physics import get_distance, get_cm, approximate_next, divide_matrix
-
-sys.path.append(os.path.abspath('./'))
 
 @pytest.mark.parametrize("xi, yi, zi, xf, yf, zf, r",
                          [
