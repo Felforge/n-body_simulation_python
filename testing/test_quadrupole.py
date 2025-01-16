@@ -1,9 +1,10 @@
 import sys
 import os
 import numpy as np
-sys.path.append(os.path.abspath('./'))
 from simulation import create_body
 from quadrupole import get_Q_ddot, get_Q_3dot, get_Q_5dot
+
+sys.path.append(os.path.abspath('./'))
 
 G = 6.6743e-11
 

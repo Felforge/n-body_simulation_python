@@ -39,11 +39,14 @@ def divide_matrix(matrix_1, matrix_2):
     Both matricies must be same dimensions
     Needed for Q_ddot / Q_3dot
     """
-    max_ratio = None
+    max_ratio = 0
     for i, row in enumerate(matrix_1):
         for j, num in enumerate(row):
-            if max_ratio is None:
-                max_ratio = num / matrix_2[i][j]
-            else:
-                max_ratio = max(max_ratio, num / matrix_2[i][j])
+            if matrix_2[i][j] != 0:
+                if max_ratio == 0:
+                    max_ratio = num / matrix_2[i][j]
+                else:
+                    ratio = num / matrix_2[i][j]
+                    if abs(ratio) > max_ratio:
+                        max_ratio = ratio
     return max_ratio
