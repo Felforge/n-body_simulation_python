@@ -7,7 +7,7 @@ class Octree:
     Octree for Barnes Hut algorithm
     Bounds are in a [min, max] format
     """
-    def __init__(self, bodies, x_bound, y_bound, z_bound):
+    def __init__(self, bodies, x_bound, y_bound, z_bound, min_distance=1e-50):
         self.bodies = bodies
         self.x_bound = x_bound
         self.y_bound = y_bound
@@ -19,9 +19,9 @@ class Octree:
         if len(bodies) > 0:
             first = bodies[0]
             self.all_same_point = all(
-                body["x"] == first["x"] and
-                body["y"] == first["y"] and
-                body["z"] == first["z"]
+                abs(body["x"] - first["x"]) < min_distance and
+                abs(body["y"] - first["y"]) < min_distance and
+                abs(body["z"] - first["z"]) < min_distance
                 for body in bodies
             )
 
@@ -58,7 +58,7 @@ class Octree:
         return_bodies = []
         for body in bodies:
             for i, dim in enumerate(["x", "y", "z"]):
-                if body[dim] < bounds[i][0] or body[dim] > bounds[i][1]:
+                if body[dim] < bounds[i][0] or body[dim] >= bounds[i][1]:
                     break
             else:
                 return_bodies.append(body)
@@ -100,6 +100,8 @@ class Octree:
 
         x, y, z = self.cm
         d = get_distance(body["x"], body["y"], body["z"], x, y, z)
+        if d == 0:
+            return 0, 0, 0
 
         s = self.x_bound[1] - self.x_bound[0]
         if (s/d < theta) or len(self.bodies) == 1:
