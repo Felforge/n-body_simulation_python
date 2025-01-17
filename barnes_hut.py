@@ -12,29 +12,51 @@ class Octree:
         self.x_bound = x_bound
         self.y_bound = y_bound
         self.z_bound = z_bound
+
         self.mass = 0
         self.cm = [0, 0, 0]
-        if len(bodies) > 1:
-            self.tree = self.create_children()
-        elif len(bodies) == 1:
+
+        if len(bodies) == 1:
             self.mass = bodies[0]["m"]
             self.cm = [bodies[0]["x"], bodies[0]["y"], bodies[0]["z"]]
+            self.tree = []
+        elif len(bodies) > 1:
+            self.tree = self.create_children()
 
+    # def get_subidivision_bounds(self, mode="ppp"):
+    #     """
+    #     Get bounds for subidivision
+    #     Mode Ex: ppp = +X +Y +Z
+    #     pmp = +X -Y +Z
+    #     """
+    #     bounds = [self.x_bound, self.y_bound, self.z_bound]
+    #     for i, sign in enumerate(mode):
+    #         if sign == "p":
+    #             bounds[i][0] = sum(bounds[i]) / 2
+    #         elif sign == "m":
+    #             bounds[i][1] = sum(bounds[i]) / 2
+    #         else:
+    #             raise BarnesHutError("Invalid Mode Format")
+    #     return bounds[0], bounds[1], bounds[2]
+    
     def get_subidivision_bounds(self, mode="ppp"):
         """
         Get bounds for subidivision
         Mode Ex: ppp = +X +Y +Z
         pmp = +X -Y +Z
         """
-        bounds = [self.x_bound, self.y_bound, self.z_bound]
+        new_bounds = [
+            self.x_bound.copy(),
+            self.y_bound.copy(),
+            self.z_bound.copy()
+        ]
         for i, sign in enumerate(mode):
+            mid = (new_bounds[i][0] + new_bounds[i][1]) / 2  # Calculate true midpoint
             if sign == "p":
-                bounds[i][0] = sum(bounds[i]) / 2
+                new_bounds[i][0] = mid  # Take upper half
             elif sign == "m":
-                bounds[i][1] = sum(bounds[i]) / 2
-            else:
-                raise BarnesHutError("Invalid Mode Format")
-        return bounds[0], bounds[1], bounds[2]
+                new_bounds[i][1] = mid  # Take lower half
+        return new_bounds[0], new_bounds[1], new_bounds[2]
 
     def subdivide_bodies(self, bodies, *bounds):
         """
@@ -49,29 +71,59 @@ class Octree:
                 return_bodies.append(body)
         return return_bodies
 
+    # def create_children(self):
+    #     """
+    #     Divide area into 8 sub-areas
+    #     """
+    #     total_mass = 0
+    #     mass_pos = [0, 0, 0]
+
+    #     children = []
+    #     for mode in ["ppp", "ppm", "pmp", "mpp", "mmp", "mpm", "pmm", "mmm"]:
+    #         x_bound, y_bound, z_bound = self.get_subidivision_bounds(mode)
+    #         bodies_in_octant = self.subdivide_bodies(self.bodies, x_bound, y_bound, z_bound)
+
+    #         for child in bodies_in_octant:
+    #             total_mass += child["m"]
+    #             for i, pos in enumerate(["x", "y", "z"]):
+    #                 mass_pos[i] += child["m"] * child[pos]
+
+    #         children.append([bodies_in_octant, x_bound, y_bound, z_bound])
+
+    #     self.mass = total_mass
+    #     if total_mass > 0:
+    #         self.cm = [pos / total_mass for pos in mass_pos]
+
+    #     return [Octree(child[0], child[1], child[2], child[3]) for child in children]
+    
     def create_children(self):
         """
         Divide area into 8 sub-areas
         """
-        tree = []
+        total_mass = 0
+        mass_pos = [0, 0, 0]
+        children = []
+        
+        print(f"Creating children for {len(self.bodies)} bodies")
         for mode in ["ppp", "ppm", "pmp", "mpp", "mmp", "mpm", "pmm", "mmm"]:
             x_bound, y_bound, z_bound = self.get_subidivision_bounds(mode)
-            child = Octree(self.subdivide_bodies(self.bodies, x_bound, y_bound, z_bound),
-                                x_bound, y_bound, z_bound)
-            self.mass += child.mass
-            for i in range(3):
-                self.cm[i] += child.mass * child.cm[i]
-            tree.append(child)
-        if self.mass > 0:
-            for i in range(3):
-                self.cm[i] /= self.mass
-        return tree
-
-    def get_bodies(self):
-        """
-        Return bodies list
-        """
-        return self.bodies
+            bodies_in_octant = self.subdivide_bodies(self.bodies, x_bound, y_bound, z_bound)
+            print(f"Mode {mode}: Found {len(bodies_in_octant)} bodies")
+            
+            for child in bodies_in_octant:
+                total_mass += child["m"]
+                for i, pos in enumerate(["x", "y", "z"]):
+                    mass_pos[i] += child["m"] * child[pos]
+                    
+            print(f"Current total_mass: {total_mass}")
+            children.append([bodies_in_octant, x_bound, y_bound, z_bound])
+        
+        self.mass = total_mass
+        if total_mass > 0:
+            self.cm = [pos / total_mass for pos in mass_pos]
+        print(f"Final mass for this node: {self.mass}")
+        
+        return [Octree(child[0], child[1], child[2], child[3]) for child in children]
 
     def get_force_components(self):
         """
