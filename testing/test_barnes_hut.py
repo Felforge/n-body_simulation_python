@@ -60,7 +60,7 @@ G = 6.6743e-11
                              [ # Extremely large mass
                                  [
                                      create_body(1e100, 0, 0, 0, 0, 0, 0),
-                                     create_body(1e100, 1e10, 1e10, 1e10, 0, 0, 0)
+                                     create_body(1e100, 1000, 1000, 1000, 0, 0, 0)
                                  ],
                                  [G * 1e194, G * 1e194, G * 1e194]
                              ]
