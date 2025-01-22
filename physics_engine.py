@@ -5,23 +5,6 @@ from basic_physics import get_cm, approximate_next, divide_matrix
 from quadrupole import get_Q_ddot, get_Q_3dot, get_Q_5dot
 from yoshida import *
 
-"""
-Bodies Contains:
-Body List in dict with keys being time ellapsed
-x_cm, y_cm, z_cm
-v_xcm, v_ycm, v_zcm
-a_xcm, a_ycm, a_zcm
-j_xcm, j_ycm, j_zcm
-s_xvm, s_yvm, s_zvm
-Body List:
-mass (m)
-x, y, z
-v_x, v_y, v_z
-a_x, a_y, a_z
-j_x, j_y, j_z
-s_x, s_y, s_z
-"""
-
 class PhysicsEngine:
     """
     Physice engine for N-body simulation
@@ -46,10 +29,10 @@ class PhysicsEngine:
         Return, X, Y, Z and total
         """
 
-    def get_newtonian_force(self, target_body) -> float | float | float | float:
+    def get_newtonian_force(self, target_body) -> float | float | float:
         """
         Use Barnes-Hut Traversal to calculate Newtonian force
-        Return, X, Y, Z and total
+        Return, X, Y, Z
         """
         bound = self.config["simulation_distance"]
         octree = Octree(self.current_bodies, [-bound, bound], [-bound, bound], [-bound, bound])
@@ -70,15 +53,19 @@ class PhysicsEngine:
         elif self.mode == "cosmic":
             return t_1
 
-    def get_acceleration(self, target_body) -> float | float | float | float:
+    def get_acceleration(self, target_body) -> float | float | float:
         """
         On galactic mode before all derivatives are calculated
         Just newtonian force is used as their is a circular dependency
-        Asumed to be isolated X, Y or Z, not vector
         """
         if not self.loaded and self.mode == "galactic":
-            return [num / target_body[0] for num in self.get_newtonian_force(target_body)]
-        return [num / target_body[0] for num in self.get_total_force(target_body)]
+            accels = [num / target_body["m"] for num in self.get_newtonian_force(target_body)]
+        else:
+            accels = [num / target_body["m"] for num in self.get_total_force(target_body)]
+        accels_dict = {}
+        for i, dim in enumerate(["x", "y", "z"]):
+            accels_dict[dim] = accels[i]
+        return accels_dict
 
     def get_max_acceleration_magnitude(self) -> int:
         """
@@ -86,8 +73,9 @@ class PhysicsEngine:
         """
         max_a = 0
         for body in self.current_bodies:
-            _, _, _, approx_a = abs(self.get_acceleration(body))
-            max_a = max(max_a, approx_a)
+            accels_dict = abs(self.get_acceleration(body))
+            a = np.sqrt(sum(value ** 2 for value in accels_dict.values()))
+            max_a = max(max_a, a)
         return max_a
 
     def get_radiation_reaction_force(self, target_body) -> float | float | float:
@@ -111,15 +99,12 @@ class PhysicsEngine:
         """
         for i, body in enumerate(self.current_bodies):
 
-            for dim in ["x", "y", "z"]:
-                pos, v = self.yoshida(dim, body, time_step)
-                self.current_bodies[i][dim] = pos
-                self.current_bodies[i][f"v_{dim}"] = v
+            new_body = self.yoshida(body, time_step)
+            self.current_bodies[i] = new_body
 
-            x, y, z, _ = _ = self.get_acceleration(body)
-            self.current_bodies[i]["a_x"] = x
-            self.current_bodies[i]["a_y"] = y
-            self.current_bodies[i]["a_z"] = z
+            accels_dict = self.get_acceleration(body)
+            for dim in ["x", "y", "z"]:
+                self.current_bodies[i][f"a_{dim}"] = accels_dict[dim]
 
             if self.mode == "galactic":
                 prev_state = self.bodies[self.prev_time]["body_list"][i]
@@ -174,19 +159,38 @@ class PhysicsEngine:
         final_time = self.start_time + time_step
         self.bodies[final_time] = self.current_state
 
-    def yoshida(self, dim, body, time_step) -> int | int:
+    def yoshida(self, body, time_step) -> float | float:
         """
-        Use Yoshida integrator to solve for position
+        Use Yoshida integrator to solve for position and velocity
         """
-        pos_1 = yoshida_pos_step_1_and_4(body[dim], body[f"v_{dim}"], time_step)
         updated_body = body
-        updated_body[dim] = pos_1
-        v_1 = yoshida_v_step_1_and_3(body[f"v_{dim}"], self.get_acceleration(updated_body), time_step)
-        pos_2 = yoshida_pos_step_2_and_3(pos_1, v_1, time_step)
-        updated_body[dim] = pos_2
-        v_2 = yoshida_v_step_2(v_1, self.get_acceleration(updated_body), time_step)
-        pos_3 = yoshida_pos_step_2_and_3(pos_2, v_2, time_step)
-        updated_body[dim] = pos_3
-        v_3 = yoshida_v_step_1_and_3(v_2, self.get_acceleration(updated_body), time_step)
-        pos_4 = yoshida_pos_step_1_and_4(pos_3, v_3, time_step)
-        return pos_4, v_3
+        dims = ["x", "y", "z"]
+
+        for dim in dims:
+            updated_body[dim] = yoshida_pos_step_1_and_4(body[dim], body[f"v_{dim}"], time_step)
+
+        for dim in dims:
+            updated_body[f"v_{dim}"] = yoshida_v_step_1_and_3(body[f"v_{dim}"],
+                                            self.get_acceleration(updated_body)[dim], time_step)
+
+        for dim in dims:
+            updated_body[dim] = yoshida_pos_step_2_and_3(updated_body[dim],
+                                        updated_body[f"v_{dim}"], time_step)
+
+        for dim in dims:
+            updated_body[f"v_{dim}"] = yoshida_v_step_2(updated_body[f"v_{dim}"],
+                                            self.get_acceleration(updated_body)[dim], time_step)
+
+        for dim in dims:
+            updated_body[dim] = yoshida_pos_step_2_and_3(updated_body[dim],
+                                        updated_body[f"v_{dim}"], time_step)
+
+        for dim in dims:
+            updated_body[f"v_{dim}"] = yoshida_v_step_1_and_3(updated_body[f"v_{dim}"],
+                                            self.get_acceleration(updated_body)[dim], time_step)
+
+        for dim in dims:
+            updated_body[dim] = yoshida_pos_step_1_and_4(updated_body[dim],
+                                        updated_body[f"v_{dim}"], time_step)
+
+        return updated_body
