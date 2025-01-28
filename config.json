@@ -2,5 +2,9 @@
     "x_max" : 810,
     "y_max" : 810,
     "z_max" : 810,
-    "simulation_distance" :  1e24
+    "simulation_distance" :  1e24,
+    "accuracy" : 0.02,
+    "radial_accuracy" : 0.02,
+    "softening_galactic" : 0.05,
+    "softening_cosmic" : 50.0
 }
